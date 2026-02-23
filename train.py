@@ -8,14 +8,14 @@ from utils import get_stories, BabiDataset, tokenize
 from model import MemNN
 
 # Hyperparameters
-EMBEDDING_DIM = 128
+EMBEDDING_DIM = 32
 BATCH_SIZE = 32
-EPOCHS = 100
+EPOCHS = 200
 LEARNING_RATE = 0.001
 HOPS = 3
 
 def train():
-    # Load data - Switching to Task 2 (Two Supporting Facts)
+    # Load data - Task 2 (Two Supporting Facts)
     train_stories = get_stories('data/qa2_two-supporting-facts_train.txt')
     test_stories = get_stories('data/qa2_two-supporting-facts_test.txt')
 
@@ -64,7 +64,7 @@ def train():
                              batch_size=BATCH_SIZE, shuffle=False, collate_fn=pad_collate)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = MemNN(vocab_size, EMBEDDING_DIM, max_sent_len, HOPS).to(device)
+    model = MemNN(vocab_size, EMBEDDING_DIM, max_sent_len, max_story_len=max_story_len, hop_count=HOPS).to(device)
     
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
@@ -73,6 +73,8 @@ def train():
     for epoch in range(EPOCHS):
         model.train()
         total_loss = 0
+        train_correct = 0
+        train_total = 0
         for s, q, a in train_loader:
             s, q, a = s.to(device), q.to(device), a.to(device)
             
@@ -86,21 +88,26 @@ def train():
             
             optimizer.step()
             total_loss += loss.item()
+            
+            # Train accuracy
+            _, predicted = torch.max(outputs.data, 1)
+            train_total += a.size(0)
+            train_correct += (predicted == a).sum().item()
         
         if (epoch + 1) % 5 == 0:
             # Evaluation
             model.eval()
-            correct = 0
-            total = 0
+            test_correct = 0
+            test_total = 0
             with torch.no_grad():
                 for s, q, a in test_loader:
                     s, q, a = s.to(device), q.to(device), a.to(device)
                     outputs, _ = model(s, q)
                     _, predicted = torch.max(outputs.data, 1)
-                    total += a.size(0)
-                    correct += (predicted == a).sum().item()
+                    test_total += a.size(0)
+                    test_correct += (predicted == a).sum().item()
             
-            print(f'Epoch [{epoch+1}/{EPOCHS}], Loss: {total_loss/len(train_loader):.4f}, Accuracy: {100 * correct / total:.2f}%')
+            print(f'Epoch [{epoch+1}/{EPOCHS}] | Loss: {total_loss/len(train_loader):.4f} | Train Acc: {100 * train_correct / train_total:.2f}% | Test Acc: {100 * test_correct / test_total:.2f}%')
 
     # Save model and metadata
     if not os.path.exists('models'):

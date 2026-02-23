@@ -18,7 +18,7 @@ def load_model():
     max_sent_len = metadata['max_sent_len']
     vocab_size = metadata['vocab_size']
     
-    model = MemNN(vocab_size, 128, max_sent_len, hop_count=3)
+    model = MemNN(vocab_size, 128, max_sent_len, max_story_len=max_story_len, hop_count=3)
     model.load_state_dict(torch.load('models/memnn_model.pth', map_location=torch.device('cpu')))
     model.eval()
     
